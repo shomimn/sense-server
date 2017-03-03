@@ -20,17 +20,26 @@ namespace SenseServer
 
         public HttpResponseMessage Get(string userId, string deviceId, string type, long begin, long end)
         {
+            string[] tokens = type.Split('&');
+
             var db = mongo.GetDatabase("sense");
-            var collection = db.GetCollection<BsonDocument>(type);
+            var result = new List<BsonDocument>();
 
-            var builder = Builders<BsonDocument>.Filter;
-            var filter = builder.Eq("userid", userId) 
-                & builder.Eq("deviceid", deviceId) 
-                & builder.Gte("senseStartTimeMillis", begin) 
-                & builder.Lte("senseStartTimeMillis", end);
+            foreach (string token in tokens)
+            {
+                var collection = db.GetCollection<BsonDocument>(token);
 
-            var result = collection.Find(filter).Project<BsonDocument>(Builders<BsonDocument>.Projection.Exclude("_id"));
-            string json = result.ToList().ToJson(new JsonWriterSettings { OutputMode = JsonOutputMode.Strict });
+                var builder = Builders<BsonDocument>.Filter;
+                var filter = builder.Eq("userid", userId)
+                    & builder.Eq("deviceid", deviceId)
+                    & builder.Gte("senseStartTimeMillis", begin)
+                    & builder.Lte("senseStartTimeMillis", end);
+
+                var found = collection.Find(filter).Project<BsonDocument>(Builders<BsonDocument>.Projection.Exclude("_id"));
+                result.AddRange(found.ToList());
+            }
+
+            string json = result.ToJson(new JsonWriterSettings { OutputMode = JsonOutputMode.Strict });
 
             var response = Request.CreateResponse(System.Net.HttpStatusCode.OK);
             response.Content = new StringContent(json, Encoding.UTF8, "application/json");
